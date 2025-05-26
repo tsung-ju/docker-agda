@@ -1,3 +1,4 @@
+ARG STDLIB_VER=2.2
 FROM alpine:latest AS base
 
 RUN apk upgrade --no-cache &&\
@@ -29,9 +30,23 @@ RUN mkdir -p /opt/agda/bin &&\
     strip /opt/agda/bin/* &&\
     cp -a src/data/ /opt/agda/
 
+# Install Agda's standard library
+# TODO: make this part easier to include multiple libraries
+ARG STDLIB_VER
+
+RUN wget -qO- "https://github.com/agda/agda-stdlib/archive/refs/tags/v${STDLIB_VER}.tar.gz" | tar xz -C /
+
+WORKDIR /agda-stdlib-${STDLIB_VER}
+
+RUN cabal run GenerateEverything -- --include-deprecated
+RUN Agda_datadir=/opt/agda/data /opt/agda/bin/agda -i . Everything.agda
+
+RUN mkdir -p /opt/agda/lib/agda-stdlib-${STDLIB_VER} &&\
+    cp -R standard-library.agda-lib src _build /opt/agda/lib/agda-stdlib-${STDLIB_VER}/
+
 FROM alpine:latest AS final
 
-ARG STDLIB_VER=2.2
+ARG STDLIB_VER
 
 COPY --from=build /opt/ /opt/
 
@@ -41,16 +56,9 @@ ENV PATH=/opt/agda/bin:$PATH
 RUN apk upgrade --no-cache &&\
     apk add     --no-cache make
 
-# Install Agda's standard library
-# [TODO] make this part easier to include multiple libraries
-
-RUN mkdir /opt/agda/lib &&\
-    wget -qO- "https://github.com/agda/agda-stdlib/archive/refs/tags/v${STDLIB_VER}.tar.gz" | tar xz -C /opt/agda/lib &&\
-    mkdir -p ~/.config/agda &&\
+RUN mkdir -p ~/.config/agda &&\
     echo "/opt/agda/lib/agda-stdlib-${STDLIB_VER}/standard-library.agda-lib" >> ~/.config/agda/libraries
 
 RUN apk add --no-cache emacs-nox &&\
     agda-mode setup &&\
     agda-mode compile
-
-ENTRYPOINT sh
