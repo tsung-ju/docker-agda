@@ -13,7 +13,7 @@ on:
       - 'master'
 
 env:
-  REGISTRY_IMAGE: ltchentw/agda
+  REGISTRY_IMAGE: tsungjuc/agda
 
 jobs:
   build:
